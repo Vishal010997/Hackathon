@@ -1,0 +1,281 @@
+---
+title: "Forecasting 2"
+output: html_document
+date: "2024-02-24"
+---
+
+```{r}
+# Load the dplyr package
+library(dplyr)
+
+# Assuming Cause_of_Death2 is your data frame containing the data
+Cause_of_Death2 <- read_excel("C:/Rutgers/Hackathon/Rutgers/Transformed Data/Cause of Death2.xlsx")
+
+# Filter the data
+filtered_data <- Cause_of_Death2 %>%
+  filter(Entity == "United States" & Death_Reason == "Congenital birth defects")
+
+# View the filtered data
+View(filtered_data)
+
+
+```
+
+```{R}
+# Load the dplyr package
+library(dplyr)
+
+# Assuming filtered_data is your filtered data frame
+
+# Drop the columns
+filtered_data <- filtered_data %>%
+  select(-Entity, -Death_Reason)
+
+# View the modified data
+View(filtered_data)
+
+```
+
+```{R}
+
+# Assuming 'child_death' is your time series data
+child_death <- as.numeric(filtered_data$Death_Count)
+
+myts <- ts(child_death, start=c(1990, 1), end=c(2019, 1), frequency=1)
+plot(myts)
+
+```
+```{r}
+
+Acf(myts)
+```
+
+```{R}
+# Perform Holt-Winters forecasting using the forecast function
+fit <- forecast(myts, h = 10)  # Adjust 'h' as needed for the forecast horizon
+
+# Plot the forecasted values with title
+plot(fit, main = "Death Rate Forecast")
+
+# Add data point values
+points(myts, col = "blue")
+```
+
+```{R}
+# Create the time series object with frequency 1 (annual)
+myts2 <- ts(child_death, start = c(1990, 1), end = c(2019, 1), frequency = 1)
+
+# Perform Holt-Winters forecasting
+HW_forecast <- forecast::forecast(myts2)
+
+# Plot the forecast
+plot(HW_forecast, xlab = "Year", ylab = "Gold Price")
+
+# Add data point values
+points(myts, col = "red")
+
+```
+
+```{r}
+
+hw_add$model
+
+```
+
+```{R}
+adf_test  <- adf.test(myts2)
+print(adf_test)
+
+
+```
+
+```{R}
+
+ndiffs(myts2)
+timeseriesdiff1 <- diff(TS_win, differences=1)
+plot(timeseriesdiff1)
+```
+```{R}
+tsdisplay(timeseriesdiff1)
+
+
+```
+```{R}
+auto_fit <- auto.arima(myts2, trace=TRUE, stepwise = FALSE,approximation = FALSE)
+auto_fit
+
+```
+```{R}
+coefficients <- coef(auto_fit)
+print(coefficients)
+summary(auto_fit)
+auto_fit1yr <- plot(forecast(auto_fit,h=12,level=c(99)))
+```
+
+```{R}
+# Load required libraries
+library(tidyverse)
+library(caret)
+# Assuming you have the dataset stored in a CSV file named 'data.csv'
+data <- read_excel("C:/Rutgers/Hackathon/Rutgers/Transformed Data/Cause of Death2.xlsx")
+
+# Assuming the dataset has columns: 'Year', 'Death_Reason', 'Death_Count'
+# For linear regression, convert 'Death_Reason' into dummy variables
+data <- data %>%
+  mutate(across(Death_Reason, as.factor))
+
+# Separate the target variable
+y <- data$Death_Count
+
+# Create dummy variables for Death_Reason
+data_dummies <- model.matrix(~. - 1, data = data[, -which(names(data) == "Death_Count")])
+
+# Combine the dummy variables with other features
+data_combined <- cbind(data_dummies, data[, which(names(data) == "Death_Count")])
+
+# Split the data into training and testing sets (80% train, 20% test)
+set.seed(42)  # For reproducibility
+train_index <- createDataPartition(y, p = 0.8, list = FALSE)
+train_data <- data_combined[train_index, ]
+test_data <- data_combined[-train_index, ]
+
+# Create a linear regression model
+model <- lm(Death_Count ~ ., data = train_data)
+
+# Make predictions on the test data
+y_pred <- predict(model, newdata = test_data)
+
+# Extract the 'Death_Count' column from the test data
+test_death_count <- as.numeric(test_data[, which(names(test_data) == "Death_Count")])
+
+# Calculate Mean Squared Error (MSE) to evaluate the model
+mse <- mean((test_death_count - y_pred)^2)
+print(paste('Mean Squared Error:', mse))
+
+# Optionally, you can also print the coefficients and intercept of the model
+# Print coefficients
+cat("Coefficients:\n")
+print(coef(model))
+
+# Print intercept
+cat("Intercept:\n")
+print(coef(model)[1])
+
+```
+```{R}
+
+# Check if significant coefficients exist in train_data column names
+significant_coefficients <- significant_coefficients[significant_coefficients %in% colnames(train_data)]
+
+# Refine the model using significant coefficients
+refined_model <- lm(Death_Count ~ ., data = train_data[, c("Death_Count", significant_coefficients)])
+
+# Make predictions on the test data using the refined model
+y_pred_refined <- predict(refined_model, newdata = test_data[, c("Death_Count", significant_coefficients)])
+
+# Evaluate the refined model
+mse_refined <- mean((test_death_count - y_pred_refined)^2)
+print(paste('Refined Model Mean Squared Error:', mse_refined))
+```
+
+```{r}
+
+# Load required libraries
+library(dplyr)
+library(caret)
+# Assuming you have the dataset stored in a CSV file named 'data.csv'
+
+data2 <- read_excel("C:/Rutgers/Hackathon/Rutgers/Transformed Data/causes-of-death-children.xlsx")
+filtered_data <- filter(data2, Entity == "United States")
+filtered_data
+
+# Prepare the data
+data <- select(filtered_data, Year, Malaria, `HIV/AIDS`, Meningitis, 
+               `Nutritional deficiencies`, `Other neonatal disorders`, 
+               `Whooping cough`, `Lower respiratory infections`, 
+               `Congenital birth defects`, Measles, 
+               `Neonatal sepsis and other neonatal infections`, 
+               `Neonatal encephalopathy due to birth asphyxia and trauma`, 
+               Drowning, Tuberculosis, `Neonatal preterm birth`, 
+               `Diarrheal diseases`, Neoplasms, Syphilis, Total_Deaths)
+
+# Split the data into training and testing sets (80% train, 20% test)
+set.seed(42)  # For reproducibility
+train_index <- createDataPartition(data$Year, p = 0.8, list = FALSE)
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+# Train the linear regression model
+model <- lm(Total_Deaths ~ ., data = train_data)
+model
+```
+```{r}
+# Make predictions
+predictions <- predict(model, newdata = test_data)
+predictions
+```
+```{R}
+# Optionally, evaluate the model
+# For example, you can calculate the Mean Squared Error (MSE)
+mse <- mean((test_data$Total_Deaths - predictions)^2)
+print(paste('Mean Squared Error:', mse))
+```
+```{r}
+model
+future_data
+```
+```{R}
+# Extract coefficients from the model
+coefficients <- coef(model)
+
+# Create a data frame to display coefficients
+coefficients_df <- data.frame(
+  Variable = names(coefficients),
+  Coefficient = as.numeric(coefficients)
+)
+
+# Print the coefficients
+print(coefficients_df)
+```
+
+```{r}
+# Define the future years for prediction
+future_years <- seq(2025, 2030, by = 1)
+
+
+
+# Rename the columns
+names(future_data)[2:18] <- c(
+  "Malaria", "HIV/AIDS", "Meningitis", 
+  "Nutritional deficiencies", "Other neonatal disorders", 
+  "Whooping cough", "Lower respiratory infections", 
+  "Congenital birth defects", "Measles", 
+  "Neonatal sepsis and other neonatal infections", 
+  "Neonatal encephalopathy due to birth asphyxia and trauma", 
+  "Drowning", "Tuberculosis", 
+  "Neonatal preterm birth", "Diarrheal diseases", 
+  "Neoplasms", "Syphilis"
+)
+# Add Total_Deaths column with NA values
+future_data$Total_Deaths <- rep(NA, length(future_years))
+# Convert all columns except for Year to numeric
+future_data <- mutate_at(future_data, vars(-Year), as.numeric)
+```
+```{R}
+model
+future_data
+```
+```{R}
+# Make predictions for each column using the trained model
+predictions <- predict(model, newdata = future_data)
+
+
+# Add the predicted values to the future_data dataframe for each column
+for (i in 2:ncol(future_data)) {
+  future_data[, i] <- predictions
+}
+
+# View the predicted data
+print(future_data)
+```
+
